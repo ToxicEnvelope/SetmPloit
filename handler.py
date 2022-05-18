@@ -14,7 +14,7 @@ def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost
     rc = subprocess.call(['which', 'tor'], stdout=subprocess.PIPE)
     if rc:
         print('\n')
-        print('[!] Unable to find tor! Exaiting..')
+        print('[!] Unable to find tor! Exiting..')
         exit(0)
     else:
         # Start tor
