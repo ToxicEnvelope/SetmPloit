@@ -66,8 +66,7 @@ def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost
             controller.remove_hidden_service(hidden_service_dir)
             shutil.rmtree(hidden_service_dir)
             print(" * Shutting down onionshare")
-            onion_share = 'onionshare-cli' if sys.platform == 'nt' else 'onionshare'
-            os.kill(int(check_output(["pidof", onion_share])), signal.SIGTERM)
+            os.kill(int(check_output(["pidof", 'onionshare'])), signal.SIGTERM)
             print(" * Shutting down tor")
             os.kill(int(check_output(["pidof", "tor"])), signal.SIGTERM)
             os.system("service tor stop")
